@@ -1,0 +1,478 @@
+---
+title: "hw3_markdown"
+author: "Ruizhou Peng"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+first load package we need in this assignment
+
+```{r}
+library(tidyverse)
+
+library(Stat2Data)
+data('Hawks')
+```
+
+### 1. Exploratory data analysis
+
+we will use "Hawks" dataset
+
+```{r}
+head(Hawks)
+```
+
+#### 1.1 location estimators
+
+q1: compute some locating estimators for Hawks' tail
+
+create a vector **HawksTail** from column **Tail**
+
+```{r}
+HawksTail <- Hawks$Tail
+```
+
+compute **mean** and **median**
+
+```{r}
+mean <- HawksTail%>%mean(na.rm=TRUE)
+median <- HawksTail%>%median(na.rm=TRUE)
+
+```
+
+#### 1.2 combining location estimators with the summarize function
+
+q1: use **summarize**,**mean**and**median**.and compute trimmed sample mean(q=0.5) of the wing length and weight
+
+```{r}
+Hawks%>%
+  select(Wing, Weight)%>%
+  summarise(across(everything(),
+                   list(mean= ~mean(.x, na.rm=TRUE), 
+                     t_mean= ~mean(.x,trim=0.5, na.rm=TRUE),
+                     med=~median(.x, na.rm=TRUE)),
+                   .names= "{.col}_{.fn}"
+                   )
+            )
+```
+
+q2: combine them with **group_by** to obtain a breakdown by species
+
+```{r}
+Hawks%>%
+  group_by(Species)%>%
+  select(Species, Wing, Weight)%>%
+  summarise(across(everything(),
+                   list(mean= ~mean(.x, na.rm=TRUE), 
+                     t_mean= ~mean(.x,trim=0.5, na.rm=TRUE),
+                     med=~median(.x, na.rm=TRUE)),
+                   .names= "{.col}_{.fn}"
+                   )
+            )
+```
+
+#### 1.3 loaction and dispersion estimators under linear transformations
+
+q1: a variable of interest $X$ sequences has a sample mean A, define a new variable $\tilde{X}$ where $\tilde{X_i} = a X_i+b$, what is the sample mean of $\tilde{X}$ as a function of a,b and A?
+
+ans: \$Mean\_{\tilde{X}} = aA+b \$
+
+q2: let $X$ has sample variance p and standard deviation q. what is those of $\tilde{X}$?
+
+ans: $\tilde{p} = a^2p\\ \tilde{q} = \left|a \right|q$
+
+q3: use **HawksTail** to verify your answer, let a = 2 and b = 3
+
+```{r}
+X <- 2*HawksTail+3
+
+# verify q1
+A = mean(HawksTail, na.rm=TRUE)
+B = mean(X, na.rm=TRUE)
+2*A+3==B
+
+# verify q2
+P = var(HawksTail, na.rm=TRUE)
+Q = sd(HawksTail, na.rm=TRUE)
+
+P_ = var(X, na.rm=TRUE)
+Q_ = sd(X, na.rm=TRUE)
+
+(4*P == P_) & (2*Q == Q_)
+```
+
+#### 1.4 Robustness of location estimators
+
+now we shall investigate the robustness of several location estimators: Sample mean, sample median and trimmed mean
+
+first extracting a vector called 'hal' and remove NA
+
+```{r}
+hal <- Hawks$Hallux
+hal <- hal[!is.na(hal)]
+```
+
+then we generate outliers
+
+```{r}
+outlier_val <- 100
+num_outliers <- 10
+corrupted_hal <- c(hal, rep(outlier_val, times=num_outliers))
+```
+
+compute the means of the original and the corrupted
+
+```{r}
+mean(hal)
+mean(corrupted_hal)
+```
+
+then we change outliers from 0 to 1000, see what happens to the corrupted_hal
+
+```{r}
+nums_outlier_vec <- seq(0,1000)
+means_vec <- c()
+
+for(outlier in nums_outlier_vec){
+  corrupted_hal <- c(hal,rep(outlier_val, times=outlier))
+  means_vec <- c(means_vec, mean(corrupted_hal))
+}
+
+```
+
+q1: generate sample median with corruption
+
+```{r}
+medians_vec <- c()
+
+for(outlier in nums_outlier_vec){
+  corrupted_hal <- c(hal,rep(outlier_val, times=outlier))
+  medians_vec <- c(medians_vec, median(corrupted_hal))
+}
+
+```
+
+q2: generate trimmed mean with corruption
+
+```{r}
+t_mean_vec <- c()
+
+for(outlier in nums_outlier_vec){
+  corrupted_hal <- c(hal,rep(outlier_val, times=outlier))
+  t_mean_vec <- c(t_mean_vec, mean(corrupted_hal, trim=0.1))
+}
+
+```
+
+q3: visualization
+
+first combine these vectors into a data frame
+
+```{r}
+df_means_medians <- data.frame(
+  num_outliers=nums_outlier_vec,
+  mean=means_vec,
+  t_mean=t_mean_vec,
+  median=medians_vec
+)
+```
+
+then reshape it to be longer, thus easy for visualization
+
+```{r}
+#cols is the arg for which columns to be transformed
+df_means_medians_longer <- df_means_medians%>%
+  pivot_longer(cols=!num_outliers,names_to = 'method', values_to = 'value')
+```
+
+now use line diagram to show trend
+
+```{r}
+df_means_medians_longer %>%ggplot(aes(x=num_outliers,
+                                  y=value,
+                                  color=method,
+                                  linetype=method
+                                  )
+                                  )+geom_line()
+  
+```
+
+in this diagram, we can see that when the number of outliers is small, the trimmed mean estimator is the most robust.
+
+#### 1.5 box plots and outliers
+
+q1: use **ggplot** and **geom_boxplot** to create a box plot which summarizes the distribution of hawk weights broken down by species
+
+```{r}
+Hawks%>%
+  select(Species, Weight)%>%
+  filter(!is.na(Weight))%>%
+  group_by(Species)%>%
+  ggplot(aes(x=Species,y=Weight))+geom_boxplot()
+```
+
+q2: compute 1-quartile, 2-quartile, 3-quartile of the weight grouped by species
+
+```{r}
+# use of summrize_at: 
+# vars-->variables to use in the summarize functions
+# list---> list of functions to summarize
+
+# quantile function:
+# probs can be a sequence of probabilities 
+#but if there is only one, then don't use c() or seq() in case to make it a vector
+Hawks%>%
+  select(Species, Weight)%>%
+  filter(!is.na(Weight))%>%
+  group_by(Species)%>%
+  summarise_at(vars(Weight),
+               list(quantile025=~quantile(.,probs=0.25),
+                    quantile050=~quantile(.,probs=0.5),
+                    quantile075=~quantile(.,probs=0.75))
+            )
+```
+
+q3: create a function **num_of_outliers** which computes the number of outliers within a sample(include missing values), taking a vector as input and a number as output
+
+```{r}
+num_of_outliers <- function(vec){
+  # first count NA numbers
+  num <- sum(is.na(vec))
+  
+  # remove NA
+  vec <- vec[!is.na(vec)]
+  
+  q1 <- quantile(vec, probs=0.25)
+  q3 <- quantile(vec, probs=0.75)
+  IQR <- q3 - q1
+  
+  upbound <- q3 + 1.5*IQR
+  lowbound <- q1 - 1.5*IQR
+  
+  # add outliers
+  num <- num+length(vec[vec>upbound | vec<lowbound])
+  
+  return(num)
+}
+```
+
+test, and correct
+
+```{r}
+num_of_outliers(c(0, 40, 60, 185, NA))
+```
+
+q4: count outliers of three samples of hawk weights by species
+
+```{r}
+Hawks%>%
+  select(Species, Weight)%>%
+  filter(!is.na(Weight))%>%
+  group_by(Species)%>%
+  summarise(num_outliers_weight=num_of_outliers(Weight))
+```
+
+#### 1.6 covariance and correlation under linear transformation
+
+q1: compute the covariance and correlation between Weight and Wing
+
+```{r}
+# cov function in R is used to calculate the cov between two vectors, not data frames?
+
+# get two vectors
+Weight <- Hawks$Weight
+Wing <- Hawks$Wing
+
+# since Weight and Wing has NA, so first replace NA
+replacing_na <- function(vec){
+  meanVal <- mean(vec, na.rm=TRUE)
+  
+  vec[is.na(vec)] = meanVal
+  return(vec)
+}
+
+
+new_Weight <- replacing_na(Weight)
+new_Wing <- replacing_na(Wing)
+
+cov(new_Wing, new_Weight)
+cor(new_Wing, new_Weight)
+```
+
+q2: suppose $X$ and $Y$ have sample covariance S and correlation R.now define $\tilde{X}=aX+b$ and $\tilde{Y}=cY+d$ what is the covariance and correlation between $\tilde{X}$ and $\tilde{Y}$?
+
+ans: the covariance and correlation between the two new samples is$S' = ac\space S\\ R' = \frac{ac}{\left| ac \right|} R$
+
+let a=2.4, b=7.1, c=-1, d=3,let X,Y be hawks' weight and wing. verify the answer
+
+```{r}
+Weight_ <- new_Weight*2.4+7.1
+Wing_ <- new_Wing*(-1)+3
+
+# double compare can't exactly equal
+cov(Weight_, Wing_)-2.4*(-1)*cov(new_Weight, new_Wing)<0.000000001
+cor(Weight_, Wing_)-(-1)*cor(new_Weight, new_Wing)<0.0000000001
+```
+
+### 2. random experiments, events and sample spaces, set theory
+
+#### 2.1 random experiments, events and sample spaces
+
+q1: write down the definition of a random experiment, event and sample space.
+
+ans: random experiment:an experiment that can be operated many times event: a set of possible outcomes of random experiment sample space: a set of all possible outcomes of random experiment
+
+q2: rolling a dice twice. give an example of what is an event in this random experiment. write down the sample space. what is the total number of different events in this experiment? is the empty set considered as an event?
+
+ans:
+
+event example--\> {(1,1), (1,2)}
+
+sample space --\> {(1,1),(1,2),(1,3),(1,4),(1,5),(1,6),(2,1),(2,2),(2,3),(2,4),(2,5),(2,6),(3,1),(3,2),(3,3),(3,4),(3,5),(3,6),(4,1),(4,2),(4,3),(4,4),(4,5),(4,6),(5,1),(5,2),(5,3),(5,4),(5,5),(5,6),(6,1),(6,2),(6,3),(6,4),(6,5),(6,6)}
+
+total number --\> 2^36^(each element has two states: exist or not, then n elements have 2^n^ possible outcomes)
+
+yes, the empty set is an event
+
+#### 2.2 set theory
+
+q1: set operations let set A,B,C defined by A={1,2,3}, B={2,4,6}, C={4,5,6}
+
+$$
+A \cup B = \{ 1,2,3,4,6 \} \\
+A \cup C = \{ 1,2,3,4,5,6 \} \\
+A \cap B = \{ 2 \}\\
+A \cap C = \emptyset\\
+A \backslash B = \{ 1,3\}\\
+A \backslash C = \{ 1,2,3 \}
+$$ A and B are not disjoint, A and C are disjoint B and A\\B are disjoint an arbitrary partition of {1,2,3,4,5,6}--\>{1,2,3}and{4,5,6} {1,2,3,4,5,6}--\>{1,2},{3,4},{5,6}
+
+q2: complements, subsets and De Morgan's law
+
+let $\Omega$ be a sample space, take a pair of events $A \subset \Omega$ and $B \subset \Omega$
+
+(A^C^)^C^ = A
+
+$\Omega^c = \emptyset$
+
+since $A\subset B, so \space A^c = B\backslash A \cup B^c\\then \quad B^c \subset A^c$
+
+$(A \cap B)^c <--> \neg (x \in A \& x \in B) == (x \notin A \| x \notin B) ==A^c \cup B^c$ $(\cap_{k=1}^KA_k)^c = \cup_{k=1}^K A_k^c$
+
+$(A \cup B)^c <--> \neg(x\in A \| x \in B) == (x\notin A \& x\notin B) == A^c \cap B^c$ $(\cup_{k=1}^KA_k)^c = \cap_{k=1}^K A_k^c$
+
+q3: $C^E = 2^K$
+
+q4:
+
+1.  $\emptyset$ is disjoint from all other set $B\subset \Omega$
+
+2.  since S1,S2,S3 and S4 are pair-wise disjoint and $\cup_{i=1}^4 S_i = \cup_{i=1}^4A_i$ so S1 to S4 form a partition of A1 to A4
+
+q5:
+
+1.  $I_{A^c} = 1-I_A$
+
+2.  B = $\Omega$
+
+3.  $(A\cap B)^c = 1- I_A·I_B$, $A^c = 1-I_A, B^c = 1-I_B$ $A^c\cup B^c = 2-I_A-I_b-(1-I_B-I_A+I_A·I_B)=1-I_A·I_B$
+
+q6: ...
+
+
+### 3. visualization
+
+in this assignment, we will explore bivariate and mutivariate plots
+
+q1: density plot
+
+create the density plot for three species on tail length
+```{r}
+Hawks%>%
+  select(Species, Tail)%>%
+  group_by(Species)%>%
+  ggplot(aes(x=Tail, color=Species))+
+  geom_density(na.rm = TRUE)+
+  xlab("Tail (mm)")
+```
+
+q2:violin plot
+
+create violin plot for three species on tail length
+```{r}
+# violin self-carry ydensity, so just need to appoint 
+# y axis to be three species and use 'fill' to colorize
+Hawks%>%
+  select(Species, Tail)%>%
+  group_by(Species)%>%
+  ggplot(aes(Tail, Species, fill=Species))+
+  geom_violin(na.rm=TRUE)+
+  xlab("Tail (mm)")+
+  ylab("Density")
+```
+
+q3: scatter plot
+
+create a scatter point plot of Tail and Weight in three species
+```{r}
+Hawks%>%
+  select(Species, Tail, Weight)%>%
+  group_by(Species)%>%
+  ggplot(aes(x=Tail, y=Weight, color=Species, shape=Species))+
+  geom_point(na.rm=TRUE)
+```
+
+1. two aesthetics are present within this plot
+
+2. the glyphs (字型) in this plot represent different species
+
+3. visual cue shows different species' Tail and Weight relationship and the distribution
+
+
+q4: trend line and facet wraps
+
+create facet plot where three panels use different scales
+
+```{r}
+# first create scatter plot with smooth trend
+pt <- Hawks%>%
+  select(Species, Tail, Weight)%>%
+  group_by(Species)%>%
+  ggplot(aes(Tail, Weight, color=Species, shape=Species))+
+  geom_point(na.rm=TRUE)+
+  geom_smooth(method="glm", na.rm=TRUE)
+
+pt
+```
+
+use **facet_wrap** show respectively
+```{r}
+pt + facet_wrap(vars(Species))
+```
+
+1. this plot uses point distribution, smooth line to show trend and different color to represent different species
+
+2. the relationship is positive, which means when tail lengths grow, the weight grows
+
+
+q5: adding annotations
+
+compute the Weight and Tail of the heaviest hawk in the dataset, then add an arrow and an annotation to indicate it
+
+```{r}
+# first use filter and select to get the heaviest hawk's weight and tail
+heaviest_hawk <- Hawks%>%select(Weight, Tail)%>%
+  filter(Weight==max(Weight, na.rm=TRUE))
+
+heaviest_hawk
+
+# then add annotation, use annoation to add text 
+# and geom_curve to draw arrow between (x,y) and (xend,yend)
+X=heaviest_hawk$Tail
+Y=heaviest_hawk$Weight
+
+pt + 
+  geom_curve(aes(x=X,y=Y*0.9, xend=X, yend=Y-10), color="black", linewidth=1, arrow=arrow(length = unit(0.1, "cm")))+
+  annotate("text",x=X-10, y=0.9*Y, label="heaviest hawk")
+```
+

@@ -379,7 +379,6 @@ q5:
 
 q6: ...
 
-
 ### 3. visualization
 
 in this assignment, we will explore bivariate and mutivariate plots
@@ -387,6 +386,7 @@ in this assignment, we will explore bivariate and mutivariate plots
 q1: density plot
 
 create the density plot for three species on tail length
+
 ```{r}
 Hawks%>%
   select(Species, Tail)%>%
@@ -399,6 +399,7 @@ Hawks%>%
 q2:violin plot
 
 create violin plot for three species on tail length
+
 ```{r}
 # violin self-carry ydensity, so just need to appoint 
 # y axis to be three species and use 'fill' to colorize
@@ -414,6 +415,7 @@ Hawks%>%
 q3: scatter plot
 
 create a scatter point plot of Tail and Weight in three species
+
 ```{r}
 Hawks%>%
   select(Species, Tail, Weight)%>%
@@ -422,12 +424,11 @@ Hawks%>%
   geom_point(na.rm=TRUE)
 ```
 
-1. two aesthetics are present within this plot
+1.  two aesthetics are present within this plot
 
-2. the glyphs (字型) in this plot represent different species
+2.  the glyphs (字型) in this plot represent different species
 
-3. visual cue shows different species' Tail and Weight relationship and the distribution
-
+3.  visual cue shows different species' Tail and Weight relationship and the distribution
 
 q4: trend line and facet wraps
 
@@ -446,14 +447,15 @@ pt
 ```
 
 use **facet_wrap** show respectively
+
 ```{r}
-pt + facet_wrap(vars(Species))
+# using arg 'scales' to adjust 
+pt + facet_wrap(vars(Species), scales='free')
 ```
 
-1. this plot uses point distribution, smooth line to show trend and different color to represent different species
+1.  this plot uses point distribution, smooth line to show trend and different color to represent different species
 
-2. the relationship is positive, which means when tail lengths grow, the weight grows
-
+2.  the relationship is positive, which means when tail lengths grow, the weight grows
 
 q5: adding annotations
 
@@ -475,4 +477,3 @@ pt +
   geom_curve(aes(x=X,y=Y*0.9, xend=X, yend=Y-10), color="black", linewidth=1, arrow=arrow(length = unit(0.1, "cm")))+
   annotate("text",x=X-10, y=0.9*Y, label="heaviest hawk")
 ```
-
